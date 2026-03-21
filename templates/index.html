@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+
+<title>Greenifier</title>
+
+<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+<style>
+
+#map {
+height: 500px;
+width: 100%;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<h1>Greenifier Prototype</h1>
+
+<p>Select an area on the map to analyze renewable energy potential.</p>
+
+<div id="map"></div>
+
+<p id="coords"></p>
+
+<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+
+<script>
+
+var map = L.map('map').setView([12.9716, 77.5946], 13); // Bangalore
+
+L.tileLayer('http://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    maxZoom: 20
+}).addTo(map);
+
+var marker;
+
+map.on('click', function(e) {
+
+    var lat = e.latlng.lat;
+    var lon = e.latlng.lng;
+
+    map.setView([lat, lon], 18);
+
+    if(marker){
+        map.removeLayer(marker);
+    }
+
+    marker = L.marker([lat, lon]).addTo(map);
+
+    // 🔥 Capture map as image
+    html2canvas(document.getElementById("map")).then(canvas => {
+
+        var imageData = canvas.toDataURL("image/png");
+
+        fetch('/analyze', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                latitude: lat,
+                longitude: lon,
+                image: imageData
+            })
+        })
+        .then(res => res.json())
+        .then(data => {
+            marker.bindPopup(
+                "<b>Solar Analysis</b><br>" +
+                "Energy: " + data.energy + " kWh/day<br>" +
+                "Cost: ₹" + data.cost + "<br>" +
+                "ROI: " + data.roi + "%"
+            ).openPopup();
+        });
+
+    });
+
+});
+
+
+</script>
+
+</body>
+
+</html>
