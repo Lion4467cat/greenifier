@@ -2,103 +2,88 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
   <title>Greenifier</title>
+
+  <!-- Leaflet -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+
+  <!-- Fonts -->
+  <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet"/>
+
+  <!-- CSS -->
   <link rel="stylesheet" href="/static/style.css"/>
 </head>
+
 <body>
+<div class="shell">
 
-<h1>Greenifier</h1>
-<p>Click anywhere on the map to analyse renewable energy potential.</p>
+  <!-- ── Header ── -->
+  <header>
+    <h1>Green<span>ifier</span></h1>
+  </header>
+  <p class="subtitle">Click anywhere on the map to analyse renewable energy potential.</p>
 
-<div id="map"></div>
+  <!-- ── Map ── -->
+  <div id="map"></div>
 
-<div id="loading" style="display:none;">
-  <p>⏳ Analysing satellite image...</p>
-</div>
-
-<div id="error-box" style="display:none; color:red;"></div>
-
-<div id="results" style="display:none;">
-  <h2>Analysis Results</h2>
-
-  <div id="result-cards">
-    <div class="card">
-      <div class="card-label">Detected area</div>
-      <div class="card-value" id="r-area">—</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Solar panels</div>
-      <div class="card-value" id="r-panels">—</div>
-    </div>
-    <div class="card">
-      <div class="card-label">System size</div>
-      <div class="card-value" id="r-kw">—</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Energy / day</div>
-      <div class="card-value" id="r-day">—</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Energy / year</div>
-      <div class="card-value" id="r-year">—</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Total cost</div>
-      <div class="card-value" id="r-cost">—</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Annual savings</div>
-      <div class="card-value" id="r-savings">—</div>
-    </div>
-    <div class="card">
-      <div class="card-label">ROI</div>
-      <div class="card-value" id="r-roi">—</div>
-    </div>
-    <div class="card">
-      <div class="card-label">Payback period</div>
-      <div class="card-value" id="r-payback">—</div>
-    </div>
-    <div class="card">
-      <div class="card-label">CO₂ saved / year</div>
-      <div class="card-value" id="r-co2">—</div>
-    </div>
+  <!-- ── Loading ── -->
+  <div id="loading">
+    <div class="spinner"></div>
+    Analysing satellite image…
   </div>
 
-  <p id="result-meta" style="font-size:0.8rem; color:#888;"></p>
+  <!-- ── Error ── -->
+  <div id="error-box"></div>
 
-  <!-- Chat section — appears after analysis -->
-  <div id="chat-section" style="margin-top:24px;">
-    <h2>Ask Greenifier AI</h2>
-    <div id="chat-history" style="min-height:60px; margin-bottom:12px;"></div>
-    <div style="display:flex; gap:8px;">
-      <input id="chat-input" type="text" placeholder="e.g. Is this worth investing in?"
-             style="flex:1; padding:10px; border-radius:6px; border:1px solid #2a3040;
-                    background:#1a1f2e; color:#e0e0e0; font-size:1rem;"/>
-      <button onclick="sendChat()"
-              style="padding:10px 20px; background:#4caf82; border:none;
-                     border-radius:6px; color:#000; font-weight:600; cursor:pointer;">
-        Ask
-      </button>
+  <!-- ── Results ── -->
+  <div id="results">
+
+    <p class="section-label">Analysis Results</p>
+
+    <div id="result-cards">
+      <div class="card"><div class="card-label">Detected area</div><div class="card-value" id="r-area">—</div></div>
+      <div class="card"><div class="card-label">Solar panels</div><div class="card-value" id="r-panels">—</div></div>
+      <div class="card hero"><div class="card-label">System size</div><div class="card-value" id="r-kw">—</div></div>
+      <div class="card"><div class="card-label">Energy / day</div><div class="card-value" id="r-day">—</div></div>
+      <div class="card"><div class="card-label">Energy / year</div><div class="card-value" id="r-year">—</div></div>
+      <div class="card"><div class="card-label">Total cost</div><div class="card-value" id="r-cost">—</div></div>
+      <div class="card"><div class="card-label">Annual savings</div><div class="card-value" id="r-savings">—</div></div>
+      <div class="card"><div class="card-label">ROI</div><div class="card-value" id="r-roi">—</div></div>
+      <div class="card"><div class="card-label">Payback period</div><div class="card-value" id="r-payback">—</div></div>
+      <div class="card"><div class="card-label">CO₂ saved / yr</div><div class="card-value" id="r-co2">—</div></div>
     </div>
-  </div>
-</div>
+
+    <p id="result-meta"></p>
+
+    <div class="divider"></div>
+
+    <!-- ── Chat ── -->
+    <div id="chat-section">
+      <p class="section-label">AI Assistant</p>
+      <h2>Ask Greenifier AI</h2>
+      <p class="chat-hint">Ask anything about this location's solar potential, costs, or savings.</p>
+
+      <div id="chat-history"></div>
+
+      <div class="chat-input-row">
+        <input id="chat-input" type="text" placeholder="Is this worth investing in?" autocomplete="off"/>
+        <button id="send-btn" onclick="sendChat()">Ask →</button>
+      </div>
+    </div>
+
+  </div><!-- /results -->
+</div><!-- /shell -->
 
 <script>
   var map = L.map('map').setView([12.9716, 77.5946], 13);
 
-  L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
-    maxZoom: 20,
-    attribution: '© Google'
-  }).addTo(map);
+  L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
+  L.tileLayer('https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
 
-  L.tileLayer('https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}', {
-    maxZoom: 20
-  }).addTo(map);
-
-  var marker       = null;
-  var lastAnalysis = null;  // stores estimates for chat context
+  var marker = null;
+  var lastAnalysis = null;
 
   map.on('click', async function (e) {
     var lat = e.latlng.lat;
@@ -109,22 +94,20 @@
     if (marker) map.removeLayer(marker);
     marker = L.marker([lat, lon]).addTo(map);
 
-    document.getElementById('results').style.display   = 'none';
+    document.getElementById('results').style.display = 'none';
     document.getElementById('error-box').style.display = 'none';
-    document.getElementById('loading').style.display   = 'block';
+    document.getElementById('loading').style.display = 'flex';
+    document.body.style.cursor = 'progress';
 
     try {
       const response = await fetch('/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ lat: lat, lon: lon, zoom: 18 })
+        body: JSON.stringify({ lat, lon, zoom: 18 })
       });
 
       const data = await response.json();
-
-      if (!response.ok || data.error) {
-        throw new Error(data.error || 'Unknown server error');
-      }
+      if (!response.ok || data.error) throw new Error(data.error || 'Unknown server error');
 
       const est = data.estimates;
       const det = data.detection;
@@ -141,27 +124,27 @@
       document.getElementById('r-co2').textContent     = est.co2_saved_kg_year + ' kg';
 
       document.getElementById('result-meta').textContent =
-        `📍 ${lat.toFixed(5)}, ${lon.toFixed(5)} · ${det.surface_count} surface(s) detected · ${det.meters_per_pixel} m/px`;
+        `📍 ${lat.toFixed(5)}, ${lon.toFixed(5)} · ${det.surface_count} surface(s) detected`;
 
       marker.bindPopup(
         '<b>Solar Analysis</b><br>' +
         'System: ' + est.system_size_kw + ' kW<br>' +
         'Energy: ' + est.energy_kwh_per_day + ' kWh/day<br>' +
-        'Cost: ₹' + est.total_cost_inr.toLocaleString('en-IN') + '<br>' +
-        'ROI: ' + est.roi_percent + '%/yr · Payback: ' + est.payback_years + ' yrs'
+        'Cost: ₹' + est.total_cost_inr.toLocaleString('en-IN')
       ).openPopup();
 
-      // Store for chat and reset history for new location
       lastAnalysis = est;
       document.getElementById('chat-history').innerHTML = '';
-
       document.getElementById('results').style.display = 'block';
+      document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
 
     } catch (err) {
-      document.getElementById('error-box').textContent   = '❌ ' + err.message;
-      document.getElementById('error-box').style.display = 'block';
+      const eb = document.getElementById('error-box');
+      eb.textContent = '❌ ' + err.message;
+      eb.style.display = 'block';
     } finally {
       document.getElementById('loading').style.display = 'none';
+      document.body.style.cursor = 'default';
     }
   });
 
@@ -169,32 +152,32 @@
     const input   = document.getElementById('chat-input');
     const history = document.getElementById('chat-history');
     const message = input.value.trim();
-
     if (!message || !lastAnalysis) return;
 
-    history.innerHTML += `<p><b style="color:#4caf82">You:</b> ${message}</p>`;
+    history.innerHTML += `<div class="chat-bubble user"><b>You</b><br>${message}</div>`;
     input.value = '';
+
+    history.innerHTML += `<div class="chat-bubble ai" id="typing"><b>Greenifier AI</b><br><em style="opacity:.5">typing…</em></div>`;
+    history.scrollTop = history.scrollHeight;
 
     try {
       const response = await fetch('/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: message, context: lastAnalysis })
+        body: JSON.stringify({ message, context: lastAnalysis })
       });
-
       const data = await response.json();
-      history.innerHTML += `<p><b style="color:#aaa">Greenifier AI:</b> ${data.reply}</p>`;
+      document.getElementById('typing')?.remove();
+      history.innerHTML += `<div class="chat-bubble ai"><b>Greenifier AI</b><br>${data.reply}</div>`;
       history.scrollTop = history.scrollHeight;
     } catch (err) {
-      history.innerHTML += `<p style="color:red">Error: ${err.message}</p>`;
+      history.innerHTML += `<div class="chat-bubble ai" style="color:#ff6b6b">Error: ${err.message}</div>`;
     }
   }
 
-  // Press Enter to send chat
   document.addEventListener('keydown', function (e) {
-    if (e.key === 'Enter') sendChat();
+    if (e.key === 'Enter' && document.activeElement.id === 'chat-input') sendChat();
   });
 </script>
-
 </body>
 </html>
