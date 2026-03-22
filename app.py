@@ -17,6 +17,7 @@ CORS(app)
 # 1. Satellite image fetcher — free, no API key
 # ---------------------------------------------------------------------------
 
+
 def fetch_satellite_image(lat: float, lon: float, zoom: int = 18) -> np.ndarray:
     lat_r = math.radians(lat)
     n = 2**zoom
@@ -54,6 +55,7 @@ def fetch_satellite_image(lat: float, lon: float, zoom: int = 18) -> np.ndarray:
 # 2. Ground resolution — pixels → real-world meters
 # ---------------------------------------------------------------------------
 
+
 def meters_per_pixel(lat: float, zoom: int = 18) -> float:
     earth_circumference = 40_075_016.686
     return (earth_circumference * math.cos(math.radians(lat))) / (256 * (2**zoom))
@@ -80,6 +82,7 @@ def get_peak_sun_hours(lat: float, lon: float) -> float:
 # ---------------------------------------------------------------------------
 # 3. Roof / usable surface detector
 # ---------------------------------------------------------------------------
+
 
 def detect_usable_surfaces(img: np.ndarray) -> dict:
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
@@ -122,6 +125,7 @@ def detect_usable_surfaces(img: np.ndarray) -> dict:
 # 4. Energy / finance estimator
 # ---------------------------------------------------------------------------
 
+
 def estimate_solar(area_sqm: float, lat: float, lon: float) -> dict:
     USABILITY_FACTOR = 0.70
     PANEL_AREA_SQM = 2.0
@@ -157,9 +161,97 @@ def estimate_solar(area_sqm: float, lat: float, lon: float) -> dict:
     }
 
 
+# ----------------------------------------------------
+# GET WIND Speed
+# ----------------------------------------------------------------------------
+def get_wind_speed(lat: float, lon: float) -> float:
+    """
+    Fetches average wind speed at 10m height from Open-Meteo API.
+    Free, no API key needed.
+    """
+    url = (
+        "https://api.open-meteo.com/v1/forecast"
+        f"?latitude={lat}&longitude={lon}"
+        "&hourly=windspeed_10m"
+        "&wind_speed_unit=ms"
+        "&forecast_days=1"
+    )
+    try:
+        resp = requests.get(url, timeout=10)
+        resp.raise_for_status()
+        data = resp.json()
+        speeds = data["hourly"]["windspeed_10m"]
+        return round(sum(speeds) / len(speeds), 2)
+    except Exception:
+        return 3.0  # fallback average wind speed m/s
+
+
+def estimate_wind(area_sqm: float, lat: float, lon: float) -> dict:
+    """
+    Estimates wind energy potential for a given area.
+    Uses small wind turbines suitable for rooftops and open land.
+    """
+    wind_speed = get_wind_speed(lat, lon)
+    print(f"WIND SPEED: {wind_speed}")
+    if wind_speed < 3.5:
+        return {
+            "equipment": "wind",
+            "wind_speed_ms": wind_speed,
+            "viable": False,
+            "message": f"Wind speed {wind_speed} m/s is too low for viable generation. Minimum recommended is 3.5 m/s.",
+            "num_turbines": 0,
+            "system_size_kw": 0,
+            "energy_kwh_per_day": 0,
+            "energy_kwh_per_year": 0,
+            "total_cost_inr": 0,
+            "annual_savings_inr": 0,
+            "payback_years": 0,
+            "roi_percent": 0,
+            "co2_saved_kg_year": 0,
+        }
+
+    # Small wind turbine constants
+    TURBINE_RATED_KW = 5.0  # kW per turbine (small rooftop/commercial)
+    TURBINE_AREA_SQM = 200  # m² needed per turbine (clearance included)
+    CAPACITY_FACTOR = 0.25  # realistic for urban/semi-urban India
+    COST_PER_KW_INR = 80_000  # small wind turbine installation cost
+    ELEC_RATE_INR = 8  # Rs/kWh
+    CO2_FACTOR = 0.82  # kg CO2 per kWh
+
+    # Wind power scales with cube of wind speed
+    # Normalised against rated speed of 12 m/s
+    RATED_WIND_SPEED = 12.0
+    speed_factor = (wind_speed / RATED_WIND_SPEED) ** 3
+    speed_factor = min(speed_factor, 1.0)  # cap at rated power
+
+    num_turbines = int(area_sqm / TURBINE_AREA_SQM)
+    system_kw = num_turbines * TURBINE_RATED_KW
+    kwh_day = system_kw * 24 * CAPACITY_FACTOR * speed_factor
+    kwh_year = kwh_day * 365
+    total_cost = system_kw * COST_PER_KW_INR
+    annual_savings = kwh_year * ELEC_RATE_INR
+    payback_years = (total_cost / annual_savings) if annual_savings > 0 else 0
+    roi_pct = (annual_savings / total_cost * 100) if total_cost > 0 else 0
+
+    return {
+        "equipment": "wind",
+        "wind_speed_ms": wind_speed,
+        "num_turbines": num_turbines,
+        "system_size_kw": round(system_kw, 2),
+        "energy_kwh_per_day": round(kwh_day, 1),
+        "energy_kwh_per_year": round(kwh_year, 0),
+        "total_cost_inr": round(total_cost, 0),
+        "annual_savings_inr": round(annual_savings, 0),
+        "payback_years": round(payback_years, 1),
+        "roi_percent": round(roi_pct, 1),
+        "co2_saved_kg_year": round(kwh_year * CO2_FACTOR, 0),
+    }
+
+
 # ---------------------------------------------------------------------------
 # 5. Flask routes
 # ---------------------------------------------------------------------------
+
 
 @app.route("/")
 def home():
@@ -181,18 +273,23 @@ def analyze():
         mpp = meters_per_pixel(lat, zoom)
         detection = detect_usable_surfaces(img)
         real_area_sqm = detection["total_pixel_area"] * (mpp**2)
-        estimates = estimate_solar(real_area_sqm, lat, lon)
+        estimates = {
+            "solar": estimate_solar(real_area_sqm, lat, lon),
+            "wind": estimate_wind(real_area_sqm, lat, lon),
+        }
 
-        return jsonify({
-            "status": "success",
-            "location": {"lat": lat, "lon": lon},
-            "detection": {
-                "area_sqm": round(real_area_sqm, 1),
-                "surface_count": detection["surface_count"],
-                "meters_per_pixel": round(mpp, 4),
-            },
-            "estimates": estimates,
-        })
+        return jsonify(
+            {
+                "status": "success",
+                "location": {"lat": lat, "lon": lon},
+                "detection": {
+                    "area_sqm": round(real_area_sqm, 1),
+                    "surface_count": detection["surface_count"],
+                    "meters_per_pixel": round(mpp, 4),
+                },
+                "estimates": estimates,
+            }
+        )
 
     except requests.HTTPError as e:
         return jsonify({"error": f"Tile fetch error: {e}"}), 502
@@ -228,7 +325,7 @@ Answer questions simply and concisely using the numbers above."""
         model="llama-3.3-70b-versatile",
         messages=[
             {"role": "system", "content": system_prompt},
-            {"role": "user",   "content": message},
+            {"role": "user", "content": message},
         ],
         max_tokens=300,
     )

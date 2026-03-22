@@ -40,7 +40,8 @@
   <!-- ── Results ── -->
   <div id="results">
 
-    <p class="section-label">Analysis Results</p>
+    <!-- Solar -->
+    <p class="section-label">☀️ Solar Analysis</p>
 
     <div id="result-cards">
       <div class="card"><div class="card-label">Detected area</div><div class="card-value" id="r-area">—</div></div>
@@ -59,11 +60,29 @@
 
     <div class="divider"></div>
 
+    <!-- Wind -->
+    <p class="section-label">💨 Wind Analysis</p>
+
+    <div id="wind-cards">
+      <div class="card"><div class="card-label">Wind speed</div><div class="card-value" id="r-wind-speed">—</div></div>
+      <div class="card"><div class="card-label">Turbines</div><div class="card-value" id="r-wind-turbines">—</div></div>
+      <div class="card hero"><div class="card-label">System size</div><div class="card-value" id="r-wind-kw">—</div></div>
+      <div class="card"><div class="card-label">Energy / day</div><div class="card-value" id="r-wind-day">—</div></div>
+      <div class="card"><div class="card-label">Energy / year</div><div class="card-value" id="r-wind-year">—</div></div>
+      <div class="card"><div class="card-label">Total cost</div><div class="card-value" id="r-wind-cost">—</div></div>
+      <div class="card"><div class="card-label">Annual savings</div><div class="card-value" id="r-wind-savings">—</div></div>
+      <div class="card"><div class="card-label">ROI</div><div class="card-value" id="r-wind-roi">—</div></div>
+      <div class="card"><div class="card-label">Payback period</div><div class="card-value" id="r-wind-payback">—</div></div>
+      <div class="card"><div class="card-label">CO₂ saved / yr</div><div class="card-value" id="r-wind-co2">—</div></div>
+    </div>
+
+    <div class="divider"></div>
+
     <!-- ── Chat ── -->
     <div id="chat-section">
       <p class="section-label">AI Assistant</p>
       <h2>Ask Greenifier AI</h2>
-      <p class="chat-hint">Ask anything about this location's solar potential, costs, or savings.</p>
+      <p class="chat-hint">Ask anything about this location's solar or wind potential, costs, or savings.</p>
 
       <div id="chat-history"></div>
 
@@ -82,7 +101,7 @@
   L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
   L.tileLayer('https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}', { maxZoom: 20 }).addTo(map);
 
-  var marker = null;
+  var marker       = null;
   var lastAnalysis = null;
 
   map.on('click', async function (e) {
@@ -94,9 +113,9 @@
     if (marker) map.removeLayer(marker);
     marker = L.marker([lat, lon]).addTo(map);
 
-    document.getElementById('results').style.display = 'none';
+    document.getElementById('results').style.display   = 'none';
     document.getElementById('error-box').style.display = 'none';
-    document.getElementById('loading').style.display = 'flex';
+    document.getElementById('loading').style.display   = 'flex';
     document.body.style.cursor = 'progress';
 
     try {
@@ -109,9 +128,11 @@
       const data = await response.json();
       if (!response.ok || data.error) throw new Error(data.error || 'Unknown server error');
 
-      const est = data.estimates;
-      const det = data.detection;
+      const est  = data.estimates.solar;
+      const wind = data.estimates.wind;
+      const det  = data.detection;
 
+      // Solar cards
       document.getElementById('r-area').textContent    = det.area_sqm + ' m²';
       document.getElementById('r-panels').textContent  = est.num_panels + ' panels';
       document.getElementById('r-kw').textContent      = est.system_size_kw + ' kW';
@@ -123,17 +144,33 @@
       document.getElementById('r-payback').textContent = est.payback_years + ' years';
       document.getElementById('r-co2').textContent     = est.co2_saved_kg_year + ' kg';
 
+      // Wind cards
+      document.getElementById('r-wind-speed').textContent   = wind.wind_speed_ms + ' m/s';
+      document.getElementById('r-wind-turbines').textContent = wind.num_turbines + ' turbines';
+      document.getElementById('r-wind-kw').textContent      = wind.system_size_kw + ' kW';
+      document.getElementById('r-wind-day').textContent     = wind.energy_kwh_per_day + ' kWh';
+      document.getElementById('r-wind-year').textContent    = wind.energy_kwh_per_year + ' kWh';
+      document.getElementById('r-wind-cost').textContent    = '₹' + wind.total_cost_inr.toLocaleString('en-IN');
+      document.getElementById('r-wind-savings').textContent = '₹' + wind.annual_savings_inr.toLocaleString('en-IN') + '/yr';
+      document.getElementById('r-wind-roi').textContent     = wind.roi_percent + '%/yr';
+      document.getElementById('r-wind-payback').textContent = wind.payback_years + ' years';
+      document.getElementById('r-wind-co2').textContent     = wind.co2_saved_kg_year + ' kg';
+      if (wind.viable === false) {
+        document.getElementById('wind-cards').innerHTML =
+          `<p style="color:#ff9800; padding:12px;">⚠️ ${wind.message}</p>`;
+      }
       document.getElementById('result-meta').textContent =
         `📍 ${lat.toFixed(5)}, ${lon.toFixed(5)} · ${det.surface_count} surface(s) detected`;
 
       marker.bindPopup(
-        '<b>Solar Analysis</b><br>' +
-        'System: ' + est.system_size_kw + ' kW<br>' +
-        'Energy: ' + est.energy_kwh_per_day + ' kWh/day<br>' +
-        'Cost: ₹' + est.total_cost_inr.toLocaleString('en-IN')
+        '<b>Greenifier Analysis</b><br>' +
+        '☀️ Solar: ' + est.system_size_kw + ' kW · ' + est.energy_kwh_per_day + ' kWh/day<br>' +
+        '💨 Wind: '  + wind.system_size_kw + ' kW · ' + wind.energy_kwh_per_day + ' kWh/day<br>' +
+        'Solar ROI: ' + est.roi_percent + '%/yr · Wind ROI: ' + wind.roi_percent + '%/yr'
       ).openPopup();
 
-      lastAnalysis = est;
+      // Store both for chat context
+      lastAnalysis = { ...est, wind };
       document.getElementById('chat-history').innerHTML = '';
       document.getElementById('results').style.display = 'block';
       document.getElementById('results').scrollIntoView({ behavior: 'smooth' });
