@@ -1,6 +1,6 @@
 flask
+flask-cors
 opencv-python
 numpy
-pillow
-scikit-learn
-matplotlib
+requests
+anthropic

@@ -1,92 +1,200 @@
 <!DOCTYPE html>
-<html>
-
+<html lang="en">
 <head>
-
-<title>Greenifier</title>
-
-<link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
-<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
-<style>
-
-#map {
-height: 500px;
-width: 100%;
-}
-
-</style>
-
+  <meta charset="UTF-8"/>
+  <title>Greenifier</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+  <link rel="stylesheet" href="/static/style.css"/>
 </head>
-
 <body>
 
-<h1>Greenifier Prototype</h1>
-
-<p>Select an area on the map to analyze renewable energy potential.</p>
+<h1>Greenifier</h1>
+<p>Click anywhere on the map to analyse renewable energy potential.</p>
 
 <div id="map"></div>
 
-<p id="coords"></p>
+<div id="loading" style="display:none;">
+  <p>⏳ Analysing satellite image...</p>
+</div>
 
-<script src="https://html2canvas.hertzen.com/dist/html2canvas.min.js"></script>
+<div id="error-box" style="display:none; color:red;"></div>
+
+<div id="results" style="display:none;">
+  <h2>Analysis Results</h2>
+
+  <div id="result-cards">
+    <div class="card">
+      <div class="card-label">Detected area</div>
+      <div class="card-value" id="r-area">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Solar panels</div>
+      <div class="card-value" id="r-panels">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">System size</div>
+      <div class="card-value" id="r-kw">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Energy / day</div>
+      <div class="card-value" id="r-day">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Energy / year</div>
+      <div class="card-value" id="r-year">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Total cost</div>
+      <div class="card-value" id="r-cost">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Annual savings</div>
+      <div class="card-value" id="r-savings">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">ROI</div>
+      <div class="card-value" id="r-roi">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">Payback period</div>
+      <div class="card-value" id="r-payback">—</div>
+    </div>
+    <div class="card">
+      <div class="card-label">CO₂ saved / year</div>
+      <div class="card-value" id="r-co2">—</div>
+    </div>
+  </div>
+
+  <p id="result-meta" style="font-size:0.8rem; color:#888;"></p>
+
+  <!-- Chat section — appears after analysis -->
+  <div id="chat-section" style="margin-top:24px;">
+    <h2>Ask Greenifier AI</h2>
+    <div id="chat-history" style="min-height:60px; margin-bottom:12px;"></div>
+    <div style="display:flex; gap:8px;">
+      <input id="chat-input" type="text" placeholder="e.g. Is this worth investing in?"
+             style="flex:1; padding:10px; border-radius:6px; border:1px solid #2a3040;
+                    background:#1a1f2e; color:#e0e0e0; font-size:1rem;"/>
+      <button onclick="sendChat()"
+              style="padding:10px 20px; background:#4caf82; border:none;
+                     border-radius:6px; color:#000; font-weight:600; cursor:pointer;">
+        Ask
+      </button>
+    </div>
+  </div>
+</div>
 
 <script>
+  var map = L.map('map').setView([12.9716, 77.5946], 13);
 
-var map = L.map('map').setView([12.9716, 77.5946], 13); // Bangalore
+  L.tileLayer('https://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+    maxZoom: 20,
+    attribution: '© Google'
+  }).addTo(map);
 
-L.tileLayer('http://mt1.google.com/vt/lyrs=s&x={x}&y={y}&z={z}', {
+  L.tileLayer('https://mt1.google.com/vt/lyrs=h&x={x}&y={y}&z={z}', {
     maxZoom: 20
-}).addTo(map);
+  }).addTo(map);
 
-var marker;
+  var marker       = null;
+  var lastAnalysis = null;  // stores estimates for chat context
 
-map.on('click', function(e) {
-
+  map.on('click', async function (e) {
     var lat = e.latlng.lat;
     var lon = e.latlng.lng;
 
     map.setView([lat, lon], 18);
 
-    if(marker){
-        map.removeLayer(marker);
-    }
-
+    if (marker) map.removeLayer(marker);
     marker = L.marker([lat, lon]).addTo(map);
 
-    // 🔥 Capture map as image
-    html2canvas(document.getElementById("map")).then(canvas => {
+    document.getElementById('results').style.display   = 'none';
+    document.getElementById('error-box').style.display = 'none';
+    document.getElementById('loading').style.display   = 'block';
 
-        var imageData = canvas.toDataURL("image/png");
+    try {
+      const response = await fetch('/analyze', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat: lat, lon: lon, zoom: 18 })
+      });
 
-        fetch('/analyze', {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json'
-            },
-            body: JSON.stringify({
-                latitude: lat,
-                longitude: lon,
-                image: imageData
-            })
-        })
-        .then(res => res.json())
-        .then(data => {
-            marker.bindPopup(
-                "<b>Solar Analysis</b><br>" +
-                "Energy: " + data.energy + " kWh/day<br>" +
-                "Cost: ₹" + data.cost + "<br>" +
-                "ROI: " + data.roi + "%"
-            ).openPopup();
-        });
+      const data = await response.json();
 
-    });
+      if (!response.ok || data.error) {
+        throw new Error(data.error || 'Unknown server error');
+      }
 
-});
+      const est = data.estimates;
+      const det = data.detection;
 
+      document.getElementById('r-area').textContent    = det.area_sqm + ' m²';
+      document.getElementById('r-panels').textContent  = est.num_panels + ' panels';
+      document.getElementById('r-kw').textContent      = est.system_size_kw + ' kW';
+      document.getElementById('r-day').textContent     = est.energy_kwh_per_day + ' kWh';
+      document.getElementById('r-year').textContent    = est.energy_kwh_per_year + ' kWh';
+      document.getElementById('r-cost').textContent    = '₹' + est.total_cost_inr.toLocaleString('en-IN');
+      document.getElementById('r-savings').textContent = '₹' + est.annual_savings_inr.toLocaleString('en-IN') + '/yr';
+      document.getElementById('r-roi').textContent     = est.roi_percent + '%/yr';
+      document.getElementById('r-payback').textContent = est.payback_years + ' years';
+      document.getElementById('r-co2').textContent     = est.co2_saved_kg_year + ' kg';
 
+      document.getElementById('result-meta').textContent =
+        `📍 ${lat.toFixed(5)}, ${lon.toFixed(5)} · ${det.surface_count} surface(s) detected · ${det.meters_per_pixel} m/px`;
+
+      marker.bindPopup(
+        '<b>Solar Analysis</b><br>' +
+        'System: ' + est.system_size_kw + ' kW<br>' +
+        'Energy: ' + est.energy_kwh_per_day + ' kWh/day<br>' +
+        'Cost: ₹' + est.total_cost_inr.toLocaleString('en-IN') + '<br>' +
+        'ROI: ' + est.roi_percent + '%/yr · Payback: ' + est.payback_years + ' yrs'
+      ).openPopup();
+
+      // Store for chat and reset history for new location
+      lastAnalysis = est;
+      document.getElementById('chat-history').innerHTML = '';
+
+      document.getElementById('results').style.display = 'block';
+
+    } catch (err) {
+      document.getElementById('error-box').textContent   = '❌ ' + err.message;
+      document.getElementById('error-box').style.display = 'block';
+    } finally {
+      document.getElementById('loading').style.display = 'none';
+    }
+  });
+
+  async function sendChat() {
+    const input   = document.getElementById('chat-input');
+    const history = document.getElementById('chat-history');
+    const message = input.value.trim();
+
+    if (!message || !lastAnalysis) return;
+
+    history.innerHTML += `<p><b style="color:#4caf82">You:</b> ${message}</p>`;
+    input.value = '';
+
+    try {
+      const response = await fetch('/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: message, context: lastAnalysis })
+      });
+
+      const data = await response.json();
+      history.innerHTML += `<p><b style="color:#aaa">Greenifier AI:</b> ${data.reply}</p>`;
+      history.scrollTop = history.scrollHeight;
+    } catch (err) {
+      history.innerHTML += `<p style="color:red">Error: ${err.message}</p>`;
+    }
+  }
+
+  // Press Enter to send chat
+  document.addEventListener('keydown', function (e) {
+    if (e.key === 'Enter') sendChat();
+  });
 </script>
 
 </body>
-
 </html>

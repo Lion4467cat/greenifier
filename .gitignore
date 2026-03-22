@@ -2,4 +2,4 @@ __pycache__/
 *.pyc
 .env
 sat.png
-detected_roofs.png
+detected_roofs.pngg
