@@ -249,6 +249,193 @@ def estimate_wind(area_sqm: float, lat: float, lon: float) -> dict:
 
 
 # ---------------------------------------------------------------------------
+# Equipment catalogue
+# ---------------------------------------------------------------------------
+
+EQUIPMENT_CATALOGUE = {
+    "solar": {
+        "longi_400w": {
+            "name": "LONGi LR4-60HPH 400W",
+            "watt_peak": 400,
+            "area_sqm": 2.0,
+            "cost_per_panel_inr": 18000,
+            "efficiency": 0.21,
+            "best_for": "rooftop",
+        },
+        "trina_550w": {
+            "name": "Trina Vertex 550W",
+            "watt_peak": 550,
+            "area_sqm": 2.5,
+            "cost_per_panel_inr": 24000,
+            "efficiency": 0.21,
+            "best_for": "rooftop",
+        },
+        "waaree_335w": {
+            "name": "Waaree WS-335",
+            "watt_peak": 335,
+            "area_sqm": 1.9,
+            "cost_per_panel_inr": 14000,
+            "efficiency": 0.18,
+            "best_for": "rooftop",
+        },
+        "first_solar_fs": {
+            "name": "First Solar FS-6 110W",
+            "watt_peak": 110,
+            "area_sqm": 1.2,
+            "cost_per_panel_inr": 8000,
+            "efficiency": 0.11,
+            "best_for": "hot_climate",
+        },
+        "sunpower_400w": {
+            "name": "SunPower Maxeon 400W",
+            "watt_peak": 400,
+            "area_sqm": 1.8,
+            "cost_per_panel_inr": 32000,
+            "efficiency": 0.22,
+            "best_for": "limited_space",
+        },
+    },
+    "wind": {
+        "suzlon_1kw": {
+            "name": "Suzlon S111 1kW",
+            "rated_kw": 1,
+            "area_sqm": 50,
+            "cost_inr": 85000,
+            "min_wind_ms": 3.5,
+            "best_for": "rooftop",
+        },
+        "wind_world_2kw": {
+            "name": "Wind World W-2kW",
+            "rated_kw": 2,
+            "area_sqm": 100,
+            "cost_inr": 160000,
+            "min_wind_ms": 4.0,
+            "best_for": "rooftop",
+        },
+        "vestas_5kw": {
+            "name": "Vestas V15 5kW",
+            "rated_kw": 5,
+            "area_sqm": 200,
+            "cost_inr": 350000,
+            "min_wind_ms": 4.5,
+            "best_for": "open_land",
+        },
+        "enercon_50kw": {
+            "name": "Enercon E-33 50kW",
+            "rated_kw": 50,
+            "area_sqm": 500,
+            "cost_inr": 3500000,
+            "min_wind_ms": 5.0,
+            "best_for": "open_land",
+        },
+        "ge_100kw": {
+            "name": "GE 1.5MW (100kW unit)",
+            "rated_kw": 100,
+            "area_sqm": 1000,
+            "cost_inr": 7000000,
+            "min_wind_ms": 6.0,
+            "best_for": "large_open_land",
+        },
+    },
+    "rainwater": {
+        "basic_rooftop": {
+            "name": "Basic Rooftop Harvesting",
+            "collection_sqm": 1,
+            "cost_per_sqm_inr": 500,
+            "storage_litres": 5000,
+            "best_for": "rooftop",
+        },
+        "large_tank": {
+            "name": "Underground Storage Tank",
+            "collection_sqm": 1,
+            "cost_per_sqm_inr": 1200,
+            "storage_litres": 20000,
+            "best_for": "open_land",
+        },
+    },
+}
+
+
+def recommend_equipment(
+    area_sqm: float, wind_speed: float, lat: float, lon: float
+) -> dict:
+    """
+    Agent 3 — recommends the best equipment based on location data.
+    Logic:
+    - Always recommend solar (works everywhere)
+    - Recommend wind only if wind speed is viable
+    - Recommend rainwater harvesting based on rainfall data
+    - Pick best product within each category based on area and location
+    """
+    recommendations = {}
+
+    # --- Solar recommendation ---
+    # Pick panel based on area available
+    if area_sqm < 100:
+        panel_id = "sunpower_400w"  # limited space → highest efficiency
+    elif lat > 20:
+        panel_id = "waaree_335w"  # north India → affordable local brand
+    else:
+        panel_id = "longi_400w"  # default → best value globally
+
+    recommendations["solar"] = {
+        "recommended": True,
+        "product_id": panel_id,
+        "product": EQUIPMENT_CATALOGUE["solar"][panel_id]["name"],
+        "reason": "Solar is viable at this location based on detected rooftop area and sunlight data.",
+    }
+
+    # --- Wind recommendation ---
+    if wind_speed >= 6.0:
+        turbine_id = "ge_100kw"
+        reason = (
+            f"Excellent wind speed ({wind_speed} m/s) — large turbines recommended."
+        )
+    elif wind_speed >= 5.0:
+        turbine_id = "enercon_50kw"
+        reason = f"Good wind speed ({wind_speed} m/s) — medium turbines viable."
+    elif wind_speed >= 4.5:
+        turbine_id = "vestas_5kw"
+        reason = f"Moderate wind speed ({wind_speed} m/s) — small turbines recommended."
+    elif wind_speed >= 4.0:
+        turbine_id = "wind_world_2kw"
+        reason = f"Low-moderate wind speed ({wind_speed} m/s) — micro turbines only."
+    elif wind_speed >= 3.5:
+        turbine_id = "suzlon_1kw"
+        reason = (
+            f"Marginal wind speed ({wind_speed} m/s) — only smallest turbines viable."
+        )
+    else:
+        turbine_id = None
+        reason = f"Wind speed {wind_speed} m/s is too low for any turbine."
+
+    recommendations["wind"] = {
+        "recommended": turbine_id is not None,
+        "product_id": turbine_id,
+        "product": EQUIPMENT_CATALOGUE["wind"][turbine_id]["name"]
+        if turbine_id
+        else None,
+        "reason": reason,
+    }
+
+    # --- Rainwater recommendation ---
+    # Simple rule: always recommend for rooftops, bigger system for larger areas
+    if area_sqm >= 200:
+        rw_id = "large_tank"
+    else:
+        rw_id = "basic_rooftop"
+
+    recommendations["rainwater"] = {
+        "recommended": True,
+        "product_id": rw_id,
+        "product": EQUIPMENT_CATALOGUE["rainwater"][rw_id]["name"],
+        "reason": "Rainwater harvesting is viable at any location with a detected rooftop.",
+    }
+
+    return recommendations
+
+
+# ---------------------------------------------------------------------------
 # 5. Flask routes
 # ---------------------------------------------------------------------------
 
@@ -273,10 +460,15 @@ def analyze():
         mpp = meters_per_pixel(lat, zoom)
         detection = detect_usable_surfaces(img)
         real_area_sqm = detection["total_pixel_area"] * (mpp**2)
+        wind_data = estimate_wind(real_area_sqm, lat, lon)
+        wind_speed = wind_data.get("wind_speed_ms", 0)
+
         estimates = {
             "solar": estimate_solar(real_area_sqm, lat, lon),
-            "wind": estimate_wind(real_area_sqm, lat, lon),
+            "wind": wind_data,
         }
+
+        recommendations = recommend_equipment(real_area_sqm, wind_speed, lat, lon)
 
         return jsonify(
             {
@@ -288,6 +480,7 @@ def analyze():
                     "meters_per_pixel": round(mpp, 4),
                 },
                 "estimates": estimates,
+                "recommendations": recommendations,
             }
         )
 

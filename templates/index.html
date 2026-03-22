@@ -57,6 +57,23 @@
     </div>
 
     <p id="result-meta"></p>
+    <div class="divider"></div>
+
+    <p class="section-label">🤖 AI Equipment Recommendations</p>
+    <div id="recommendations">
+      <div class="card">
+        <div class="card-label">☀️ Solar</div>
+        <div class="card-value" id="rec-solar" style="font-size:0.85rem; line-height:1.5;">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">💨 Wind</div>
+        <div class="card-value" id="rec-wind" style="font-size:0.85rem; line-height:1.5;">—</div>
+      </div>
+      <div class="card">
+        <div class="card-label">🌧️ Rainwater</div>
+        <div class="card-value" id="rec-rain" style="font-size:0.85rem; line-height:1.5;">—</div>
+      </div>
+    </div>
 
     <div class="divider"></div>
 
@@ -131,6 +148,7 @@
       const est  = data.estimates.solar;
       const wind = data.estimates.wind;
       const det  = data.detection;
+      const rec  = data.recommendations;
 
       // Solar cards
       document.getElementById('r-area').textContent    = det.area_sqm + ' m²';
@@ -159,6 +177,12 @@
         document.getElementById('wind-cards').innerHTML =
           `<p style="color:#ff9800; padding:12px;">⚠️ ${wind.message}</p>`;
       }
+      // Show recommendations
+      document.getElementById('rec-solar').textContent  = rec.solar.product + ' — ' + rec.solar.reason;
+      document.getElementById('rec-wind').textContent   = rec.wind.recommended
+            ? rec.wind.product + ' — ' + rec.wind.reason
+            : rec.wind.reason;
+      document.getElementById('rec-rain').textContent   = rec.rainwater.product + ' — ' + rec.rainwater.reason;
       document.getElementById('result-meta').textContent =
         `📍 ${lat.toFixed(5)}, ${lon.toFixed(5)} · ${det.surface_count} surface(s) detected`;
 

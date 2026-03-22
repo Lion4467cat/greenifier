@@ -399,3 +399,10 @@ h2 {
 }
 .leaflet-popup-tip { background: #0d1117 !important; }
 .leaflet-popup-content b { color: var(--green); }
+
+#recommendations {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-top: 16px;
+}
