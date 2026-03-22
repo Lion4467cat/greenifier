@@ -1,8 +1,6 @@
 import math
 import os
-from ibm_watsonx_ai import APIClient, Credentials
-from ibm_watsonx_ai.foundation_models import ModelInference
-import anthropic
+from groq import Groq
 import cv2
 import numpy as np
 import requests
@@ -266,17 +264,14 @@ def chat():
     message = body.get("message", "")
     context = body.get("context", {})
 
-    credentials = Credentials(
-        url="https://us-south.ml.cloud.ibm.com", api_key=os.getenv("IBM_API_KEY")
-    )
+    client = Groq(api_key=os.getenv("GROQ_API_KEY"))
 
-    model = ModelInference(
-        model_id="ibm/granite-13b-chat-v2",
-        credentials=credentials,
-        project_id=os.getenv("IBM_PROJECT_ID"),
-    )
-
-    prompt = f"""You are Greenifier's AI assistant. A location has been analysed for solar energy potential.
+    response = client.chat.completions.create(
+        model="llama-3.3-70b-versatile",
+        messages=[
+            {
+                "role": "system",
+                "content": f"""You are Greenifier's AI assistant. A location has been analysed for solar energy potential.
 
 Results:
 - Installable area: {context.get("installable_area_sqm")} m²
@@ -290,12 +285,13 @@ Results:
 - Payback period: {context.get("payback_years")} years
 - CO2 saved per year: {context.get("co2_saved_kg_year")} kg
 
-Answer this question simply and concisely using the numbers above:
-{message}"""
+Answer simply and concisely using the numbers above.""",
+            },
+            {"role": "user", "content": message},
+        ],
+    )
 
-    response = model.generate_text(prompt=prompt)
-
-    return jsonify({"reply": response})
+    return jsonify({"reply": response.choices[0].message.content})
 
 
 if __name__ == "__main__":
